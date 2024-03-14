@@ -10,10 +10,34 @@ gitlabAddr = '地址'  # gitlab地址名
 target = 'group name'  # 项目分组名 ， 为空则下载整个gitlab代码，慎用！
 
 
+def getUrls(file_name):
+    file = None
+    try:
+        path = os.path.join(os.getcwd(), file_name)
+        print(path + '\n')
+        file = open(path, encoding='utf-8')
+        return file.readlines()
+    finally:
+        file.close()
+
+
+def getToken(filename):
+    fileobj = getUrls(filename)
+    token = ""
+    if fileobj is None:
+        print("Please Check the Titlefile, there is error url!")
+    else:
+        tmp_token = fileobj[0].split("=")
+        token = tmp_token[1]
+    return token
+
+
 def get_next(group_id):
     url = gen_next_url(group_id)
     allProjects = urlopen(url)
     allProjectsDict = json.loads(allProjects.read().decode())
+    thisProjectURL = ""
+    resultCode = None
     if len(allProjectsDict) == 0:
         return
     for thisProject in allProjectsDict:
@@ -27,7 +51,8 @@ def get_next(group_id):
             resultCode = subprocess.Popen(command)
             time.sleep(1)
         except Exception as e:
-            print("Error on %s: %s" % (thisProjectURL, e.strerror))
+            print("Error on %s" % (thisProjectURL))
+            print("Unexception Error:{}".format(e))
     return resultCode
 
 
@@ -45,6 +70,7 @@ def get_sub_groups(parent_id):
     allProjects = urlopen(url)
     allProjectsDict = json.loads(allProjects.read().decode())
     sub_ids = []
+    id = ""
     if len(allProjectsDict) == 0:
         return sub_ids
     for thisProject in allProjectsDict:
@@ -52,7 +78,8 @@ def get_sub_groups(parent_id):
             id = thisProject['id']
             sub_ids.append(id)
         except Exception as e:
-            print("Error on %s: %s" % (id, e.strerror))
+            print("Error on %s" % (id))
+            print("Unexception Error:{}".format(e))
     return sub_ids
 
 
@@ -132,27 +159,40 @@ def download_global_code():
 def main():
     filename = "Titles.txt"
     base_path = os.getcwd()
-    this_name = ""
-    if target == '':
-        download_global_code()
-    else:
-        url = "https://%s/api/v4/groups?private_token=%s" % (gitlabAddr, gitlabToken)
-        allProjects = urlopen(url)
-        allProjectsDict = json.loads(allProjects.read().decode())
-        if len(allProjectsDict) == 0:
-            return
-        target_id = ''
-        for thisProject in allProjectsDict:
-            try:
-                this_name = thisProject['name']
-                if target == this_name:
-                    target_id = thisProject['id']
-                    break
-            except Exception as e:
-                print("Error on %s:" % (this_name))
-                print("Unexception Error:{}".format(e))
 
-        download_code(target_id)
+    fileobj = getUrls(filename)
+    if fileobj is None:
+        print("Please Check the Titlefile, there is error url!")
+    else:
+        tmp_token = fileobj[0].split("=")
+        gitlabToken = getToken(tmp_token[1])
+        tmp_groupname = fileobj[1].split("=")
+        target = tmp_groupname[1]
+
+        it = 2
+        while it < len(fileobj):
+            this_name = ""
+            if target == '':
+                download_global_code()
+            else:
+                gitlabAddr_list = fileobj[it].split("=")
+                url = "https://%s/api/v4/groups?private_token=%s" % (gitlabAddr_list[1], gitlabToken)
+                allProjects = urlopen(url)
+                allProjectsDict = json.loads(allProjects.read().decode())
+                if len(allProjectsDict) == 0:
+                    return
+                target_id = ''
+                for thisProject in allProjectsDict:
+                    try:
+                        this_name = thisProject['name']
+                        if target == this_name:
+                            target_id = thisProject['id']
+                            break
+                    except Exception as e:
+                        print("Error on %s:" % (this_name))
+                        print("Unexception Error:{}".format(e))
+                download_code(target_id)
+                it = it + 1
         return
 
 
